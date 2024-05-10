@@ -18,22 +18,59 @@ JWT_REFRESH_SECRET=rerv1jv15v1CVBnasd23jnv1j3123nvrqwr23" >  .env'''
     }
 
     stage('Build') {
+      parallel {
+        stage('Build backend') {
+          steps {
+            echo 'i from Build'
+            sh 'docker build -t backendfromjenkins --target backend -f Dockerfile .'
+          }
+        }
+
+        stage('build frontend') {
+          steps {
+            sh 'docker build -t frontendfromjenkins --target frontend -f Dockerfile .'
+          }
+        }
+
+        stage('build nginx') {
+          steps {
+            sh 'docker build -t nginxfromjenkins -f Dockerfile.nginx .'
+          }
+        }
+
+      }
+    }
+
+    stage('Push images to Docker hub') {
       steps {
-        echo 'i from Build'
-        sh 'docker-compose -f docker-compose.yml -f docker-compose.prod.yml                                         up -d --build'
+        echo '[+] pushing now...'
+        sh '''docker tag backendfromjenkins abdoemam/ecommerce_app:\'backendfromjenkins\'$BUILD_NUMBER
+
+  '''
+        sh '''docker tag frontendfromjenkins abdoemam/ecommerce_app:\'frontendfromjenkins\'$BUILD_NUMBER
+
+'''
       }
     }
 
     stage('Testing') {
       steps {
-        echo 'hi from testing'
+        echo 'hi from unit testing'
       }
     }
 
-    stage('Remove containers') {
+    stage('Deploy') {
       steps {
-        input(message: 'do you want me to stop containers now?', ok: 'yes')
-        sh 'docker-compose -f docker-compose.yml -f docker-compose.prod.yml down'
+        sh 'kubectl apply -f cm.yml ; kubectl apply -f pv.yml ; kubectl apply -f pvc.yml ;   kubectl apply -f deployredis.yml ; kubectl apply -f deploy.yml   ; kubectl apply -f deploynginx.yml ; kubectl apply -f service.yml ; kubectl apply -f ingress.yml'
+        sh 'kubectl get all'
+        echo 'wow run successfully'
+      }
+    }
+
+    stage('stop Deploy') {
+      steps {
+        input(message: 'Do you want me to stop cluster', ok: 'yeeas')
+        sh 'kubectl delete all --all -n default'
       }
     }
 
